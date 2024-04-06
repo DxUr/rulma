@@ -13,12 +13,16 @@
 
 /* ERRORS: */
 enum {
+	UNREACHABLE,
 	IDENTIFIER_TOO_LONG,
 	INVALID_NUMBER,
+	UNTERMINATED_STRING,
 };
 static const char *errors[] = {
+	"Unreachable",
 	"Identifier too long",
 	"Invalid number",
+	"Unterminated string",
 };
 #define ERR(E) (errors[E])
 
@@ -344,6 +348,9 @@ static Token *_parse_identifier(Tokenizer *p_tokenizer) {
 			_consume(p_tokenizer);
 	}
 
+	if (len == 1 && _is_underscore(*name))
+		return _create_token(p_tokenizer, TK_UNDERSCORE, 0);
+
 	if (len == MAX_IDENTIFIER_LENGTH - 1 && _is_alphanum(_get_current_char(p_tokenizer)))
 		return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(IDENTIFIER_TOO_LONG));
 
@@ -356,7 +363,6 @@ static Token *_parse_identifier(Tokenizer *p_tokenizer) {
 
 
 static Token *_parse_number(Tokenizer *p_tokenizer) {
-	// FIXME: Implement this
 	char buffer[MAX_NUMBER_LENGTH];
 	buffer[MAX_NUMBER_LENGTH - 1] = '\0';
 	size_t len = 0;
@@ -408,6 +414,22 @@ static Token *_parse_number(Tokenizer *p_tokenizer) {
 }
 
 
+static Token *_parse_string(Tokenizer *p_tokenizer) {
+	_consume(p_tokenizer);
+	char c;
+	while (c = _get_current_char(p_tokenizer), c != '"') {
+		if (c == -1)
+			return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(UNTERMINATED_STRING));
+		_consume(p_tokenizer);
+	}
+	_consume(p_tokenizer);
+	Literal *lt = (Literal*)malloc(sizeof(Literal));
+	lt->type = LT_STRING;
+	lt->value = (intptr_t)malloc(MAX_IDENTIFIER_LENGTH);
+	return _create_token(p_tokenizer, TK_LITERAL, (intptr_t)lt);
+}
+
+
 static void _parse_comment(Tokenizer *p_tokenizer) {
 	char c;
 	while (c = _get_current_char(p_tokenizer), c != '\n' && c != -1)
@@ -434,13 +456,165 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
     char c = _get_current_char(p_tokenizer);
     switch (c) {
         case -1:
-            return NULL;
+            return _create_token(p_tokenizer, TK_EOF, 0);
         case '\n':
-        case '\t':
         case ' ':
             _consume(p_tokenizer);
             goto start;
-        case '#':
+		case '@':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_ANNOTATION, 0);
+		case '<':
+			_consume(p_tokenizer);
+			switch (_get_current_char(p_tokenizer)) {
+				case '=':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_LESS_EQUAL, 0);
+				case '<':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_LESS_LESS, 0);
+			}
+			return _create_token(p_tokenizer, TK_LESS, 0);
+		case '>':
+			_consume(p_tokenizer);
+			switch (_get_current_char(p_tokenizer)) {
+				case '=':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_GREATER_EQUAL, 0);
+				case '<':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_GREATER_GREATER, 0);
+			}
+			return _create_token(p_tokenizer, TK_GREATER, 0);
+		case '=':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '=') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_EQUAL_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_EQUAL, 0);
+		case '!':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '=') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_BANG_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_BANG, 0);
+		case '&':
+			_consume(p_tokenizer);
+			switch (_get_current_char(p_tokenizer)) {
+				case '&':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_AMPERSAND_AMPERSAND, 0);
+				case '=':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_AMPERSAND_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_AMPERSAND, 0);
+		case '|':
+			_consume(p_tokenizer);
+			switch (_get_current_char(p_tokenizer)) {
+				case '|':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_PIPE_PIPE, 0);
+				case '=':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_PIPE_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_PIPE, 0);
+		case '~':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_TILDE, 0);
+		case '^':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '=') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_CARET_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_CARET, 0);
+		case '+':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '=') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_PLUS_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_PLUS, 0);
+		case '-':
+			_consume(p_tokenizer);
+			switch (_get_current_char(p_tokenizer)) {
+				case '=':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_MINUS_EQUAL, 0);
+				case '>':
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_FORWARD_ARROW, 0);
+			}
+			return _create_token(p_tokenizer, TK_MINUS, 0);
+		case '*':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '*') {
+				_consume(p_tokenizer);
+				if (_get_current_char(p_tokenizer) == '=') {
+					_consume(p_tokenizer);
+					return _create_token(p_tokenizer, TK_STAR_STAR_EQUAL, 0);
+				}
+				return _create_token(p_tokenizer, TK_STAR_STAR, 0);
+			}
+			return _create_token(p_tokenizer, TK_STAR, 0);
+		case '/':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '=') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_SLASH_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_SLASH, 0);
+		case '%':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '=') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_PERCENT_EQUAL, 0);
+			}
+			return _create_token(p_tokenizer, TK_PERCENT, 0);
+		case '[':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_BRACKET_OPEN, 0);
+		case ']':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_BRACKET_CLOSE, 0);
+		case '{':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_BRACE_OPEN, 0);
+		case '}':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_BRACE_CLOSE, 0);
+		case '(':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_PARENTHESIS_OPEN, 0);
+		case ')':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_PARENTHESIS_CLOSE, 0);
+		case ',':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_COMMA, 0);
+		case ';':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_SEMICOLON, 0);
+		case '.':
+			_consume(p_tokenizer);
+			if (_get_current_char(p_tokenizer) == '.') {
+				_consume(p_tokenizer);
+				return _create_token(p_tokenizer, TK_PERIOD_PERIOD, 0);
+			}
+			return _create_token(p_tokenizer, TK_PERIOD, 0);
+		case ':':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_COLON, 0);
+		case '$':
+			_consume(p_tokenizer);
+			return _create_token(p_tokenizer, TK_DOLLAR, 0);
+		case '"':
+			return _parse_string(p_tokenizer);
+		case '#':
 			_consume(p_tokenizer);
             _parse_comment(p_tokenizer);
 			goto start;
@@ -451,7 +625,7 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
                 return _parse_identifier(p_tokenizer);
     }
     
-    return NULL;
+    return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(UNREACHABLE));
 }
 
 

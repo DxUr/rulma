@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
     // Init the tokenizer
     Tokenizer *tk = tokenizerInit(get_char, (void*)f);
 
-    while (tokenizerAdvance(tk) != NULL) {
+    while (tokenizerAdvance(tk) != TK_EOF) {
         printf("TOKEN: %s\n", tokenizerGetTokenName(tokenizerGetCurrent(tk)->type));
         if (tokenizerGetCurrent(tk)->type == TK_LITERAL) {
             Literal *lt = (Literal*)tokenizerGetCurrent(tk)->value;
@@ -31,6 +31,7 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    printf("TOKEN: %s\n", tokenizerGetTokenName(tokenizerGetCurrent(tk)->type));
 
     tokenizerTerminate(tk);
 
