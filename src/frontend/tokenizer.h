@@ -115,8 +115,7 @@ typedef enum {
     TK_QUESTION_MARK,
     // Special
     TK_ERROR,
-    TK_MAX,
-    TK_EOF = -1
+    TK_EOF
 } TK_TYPE;
 
 

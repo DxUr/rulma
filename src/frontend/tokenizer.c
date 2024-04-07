@@ -426,6 +426,7 @@ static Token *_parse_string(Tokenizer *p_tokenizer) {
 	Literal *lt = (Literal*)malloc(sizeof(Literal));
 	lt->type = LT_STRING;
 	lt->value = (intptr_t)malloc(MAX_IDENTIFIER_LENGTH);
+	strcpy((char*)lt->value, "Good Job");
 	return _create_token(p_tokenizer, TK_LITERAL, (intptr_t)lt);
 }
 
@@ -458,6 +459,7 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
         case -1:
             return _create_token(p_tokenizer, TK_EOF, 0);
         case '\n':
+		case '\t':
         case ' ':
             _consume(p_tokenizer);
             goto start;
@@ -621,10 +623,10 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
         default:
             if (_is_digit(c))
                 return _parse_number(p_tokenizer);
-            else if (_is_alpha(c))
+            else if (_is_alpha(c) || _is_underscore(c))
                 return _parse_identifier(p_tokenizer);
     }
-    
+
     return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(UNREACHABLE));
 }
 

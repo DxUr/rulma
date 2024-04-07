@@ -14,20 +14,27 @@ int main(int argc, char *argv[]) {
     // Init the tokenizer
     Tokenizer *tk = tokenizerInit(get_char, (void*)f);
 
-    while (tokenizerAdvance(tk) != TK_EOF) {
+    while (tokenizerAdvance(tk)->type != TK_EOF) {
         printf("TOKEN: %s\n", tokenizerGetTokenName(tokenizerGetCurrent(tk)->type));
-        if (tokenizerGetCurrent(tk)->type == TK_LITERAL) {
-            Literal *lt = (Literal*)tokenizerGetCurrent(tk)->value;
-            switch (lt->type) {
-                case LT_INT:
-                    printf("int: %ld\n", lt->value);
-                    break;
-                case LT_FLOAT:
-                    printf("float: %f\n", *((float*)lt->value));
-                    break;
-                case LT_STRING:
-                    printf("string: %s\n", (char*)lt->value);
-            }
+        switch (tokenizerGetCurrent(tk)->type) {
+            case TK_ERROR:
+                printf("err: %s\n", (char*)tokenizerGetCurrent(tk)->value);
+                break;
+            case TK_LITERAL:;
+                Literal *lt = (Literal*)tokenizerGetCurrent(tk)->value;
+                switch (lt->type) {
+                    case LT_INT:
+                        printf("int: %ld\n", lt->value);
+                        break;
+                    case LT_FLOAT:
+                        printf("float: %f\n", *((float*)lt->value));
+                        break;
+                    case LT_STRING:
+                        printf("string: %s\n", (char*)lt->value);
+                }
+                break;
+            default:
+                break;
         }
     }
     
