@@ -14,23 +14,25 @@ int main(int argc, char *argv[]) {
     // Init the tokenizer
     Tokenizer *tk = tokenizerInit(get_char, (void*)f);
 
-    while (tokenizerAdvance(tk)->type != TK_EOF) {
-        printf("TOKEN: %s\n", tokenizerGetTokenName(tokenizerGetCurrent(tk)->type));
-        switch (tokenizerGetCurrent(tk)->type) {
+    while (tokenizerTokenGetType(tokenizerAdvance(tk)) != TK_EOF) {
+        Token* t = tokenizerGetCurrent(tk);
+        printf("TOKEN: %s\n", tokenizerTokenGetTypeName(t));
+        switch (tokenizerTokenGetType(t)) {
             case TK_ERROR:
-                printf("err: %s\n", (char*)tokenizerGetCurrent(tk)->value);
+                printf("err: %s\n", tokenizerTokenGetErrorString(t));
                 break;
+            case TK_IDENTIFIER:
             case TK_LITERAL:;
-                Literal *lt = (Literal*)tokenizerGetCurrent(tk)->value;
-                switch (lt->type) {
+                Literal *lt = tokenizerTokenGetLiteral(t);
+                switch (literalGetType(lt)) {
                     case LT_INT:
-                        printf("int: %ld\n", lt->value);
+                        printf("int: %d\n", *(int*)literalGetVal(lt));
                         break;
                     case LT_FLOAT:
-                        printf("float: %f\n", *((float*)lt->value));
+                        printf("float: %f\n", *(float*)literalGetVal(lt));
                         break;
                     case LT_STRING:
-                        printf("string: %s\n", (char*)lt->value);
+                        printf("string: %s\n", (char*)literalGetVal(lt));
                 }
                 break;
             default:
@@ -38,7 +40,7 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    printf("TOKEN: %s\n", tokenizerGetTokenName(tokenizerGetCurrent(tk)->type));
+    printf("TOKEN: %s\n", tokenizerTokenGetTypeName(tokenizerGetCurrent(tk)));
 
     tokenizerTerminate(tk);
 

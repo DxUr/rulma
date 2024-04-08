@@ -10,6 +10,11 @@
 #define MAX_IDENTIFIER_LENGTH 64
 #define MAX_NUMBER_LENGTH 128
 
+struct token {
+    TK_TYPE type;
+    void* data;
+};
+
 
 /* ERRORS: */
 enum {
@@ -147,7 +152,7 @@ struct tokenizer {
     TkGetCharCallback get_char_callback;
     void* callback_bind_ctx;
     Token *current_tk;
-    bool _should_be_free;
+    bool tk_should_be_free;
     int indent_lv;
     char last_char;
     bool is_char_consumed;
@@ -201,29 +206,13 @@ static inline bool _is_alphanum(char p_char) {
  * Tokenizer functions
 */
 
-static void _free_literal(Literal *p_literal) {
-	switch (p_literal->type) {
-		case LT_FLOAT:
-			free((float*)p_literal->value);
-			break;
-		case LT_STRING:
-			free((char*)p_literal->value);
-			break;
-		default:
-			break;
-	}
-	free(p_literal);
-}
-
 
 static void _free_token(Token *p_token) {
 	switch (p_token->type) {
-		case TK_IDENTIFIER:
-			free((char*)p_token->value);
-			break;
 		case TK_LITERAL:
-			_free_literal((Literal*)p_token->value);
-			break;
+		case TK_IDENTIFIER:
+			if(p_token->data)
+				literalFree((Literal*)p_token->data);
 		default:
 			break;
 	}
@@ -231,13 +220,13 @@ static void _free_token(Token *p_token) {
 }
 
 
-static Token *_create_token(Tokenizer *p_tokenizer, TK_TYPE p_type, intptr_t p_value) {
+static Token *_create_token(Tokenizer *p_tokenizer, TK_TYPE p_type, void *p_data) {
     Token *tk = (Token*)malloc(sizeof(Token));
     if (!tk)
         return NULL;
     tk->type = p_type;
-    tk->value = p_value;
-    if (p_tokenizer->current_tk && p_tokenizer->_should_be_free)
+    tk->data = p_data;
+    if (p_tokenizer->current_tk && p_tokenizer->tk_should_be_free)
         _free_token(p_tokenizer->current_tk);
     p_tokenizer->current_tk = tk;
     p_tokenizer->indent_lv = 0;
@@ -349,16 +338,16 @@ static Token *_parse_identifier(Tokenizer *p_tokenizer) {
 	}
 
 	if (len == 1 && _is_underscore(*name))
-		return _create_token(p_tokenizer, TK_UNDERSCORE, 0);
+		return _create_token(p_tokenizer, TK_UNDERSCORE, NULL);
 
 	if (len == MAX_IDENTIFIER_LENGTH - 1 && _is_alphanum(_get_current_char(p_tokenizer)))
-		return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(IDENTIFIER_TOO_LONG));
+		return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(IDENTIFIER_TOO_LONG));
 
 	TK_TYPE tk_type = has_digit ? TK_IDENTIFIER : _which_identifier(name, len);
-	intptr_t val = 0;
+	Literal *lt = NULL;
 	if (tk_type == TK_IDENTIFIER)
-		val = (intptr_t)strncpy((char*)malloc(len + 1), name, len + 1);
-	return _create_token(p_tokenizer, tk_type, val);
+		lt = literalCreate(LT_STRING, (void*)name);
+	return _create_token(p_tokenizer, tk_type, (void*)lt);
 }
 
 
@@ -395,22 +384,21 @@ static Token *_parse_number(Tokenizer *p_tokenizer) {
 	
 	// FIXME: GET NUMBER SUFFIX
 	
-	Literal *lt = (Literal*)malloc(sizeof(Literal));
+	Literal *lt;
 	switch (type) {
-		case INT:
-			lt->type = LT_INT;
-			lt->value = strtol(buffer, NULL, 10);
+		case INT:;
+			int integer = strtol(buffer, NULL, 10);
+			lt = literalCreate(LT_INT, &integer);
 			break;
-		case FLOAT:
-			lt->type = LT_FLOAT;
-			lt->value = (intptr_t)malloc(sizeof(float));
-			*((float*)lt->value) = strtof(buffer, NULL);
+		case FLOAT:;
+			float floating_point = strtof(buffer, NULL);
+			lt = literalCreate(LT_FLOAT, &floating_point);
 			break;
 	}
 
-	return _create_token(p_tokenizer, TK_LITERAL, (intptr_t)lt);
+	return _create_token(p_tokenizer, TK_LITERAL, (void*)lt);
 	invalid:
-		return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(INVALID_NUMBER));
+		return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(INVALID_NUMBER));
 }
 
 
@@ -419,15 +407,12 @@ static Token *_parse_string(Tokenizer *p_tokenizer) {
 	char c;
 	while (c = _get_current_char(p_tokenizer), c != '"') {
 		if (c == -1)
-			return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(UNTERMINATED_STRING));
+			return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(UNTERMINATED_STRING));
 		_consume(p_tokenizer);
 	}
 	_consume(p_tokenizer);
-	Literal *lt = (Literal*)malloc(sizeof(Literal));
-	lt->type = LT_STRING;
-	lt->value = (intptr_t)malloc(MAX_IDENTIFIER_LENGTH);
-	strcpy((char*)lt->value, "Good Job");
-	return _create_token(p_tokenizer, TK_LITERAL, (intptr_t)lt);
+	Literal *lt = literalCreate(LT_STRING, "Good Job");
+	return _create_token(p_tokenizer, TK_LITERAL, (void*)lt);
 }
 
 
@@ -445,7 +430,7 @@ Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx) {
     tk->get_char_callback = p_get_char;
     tk->callback_bind_ctx = p_bind_ctx;
     tk->current_tk = NULL;
-    tk->_should_be_free = true;
+    tk->tk_should_be_free = true;
     tk->last_char = -1;
     tk->is_char_consumed = true;
     return tk;
@@ -457,7 +442,7 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
     char c = _get_current_char(p_tokenizer);
     switch (c) {
         case -1:
-            return _create_token(p_tokenizer, TK_EOF, 0);
+            return _create_token(p_tokenizer, TK_EOF, NULL);
         case '\n':
 		case '\t':
         case ' ':
@@ -465,155 +450,155 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
             goto start;
 		case '@':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_ANNOTATION, 0);
+			return _create_token(p_tokenizer, TK_ANNOTATION, NULL);
 		case '<':
 			_consume(p_tokenizer);
 			switch (_get_current_char(p_tokenizer)) {
 				case '=':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_LESS_EQUAL, 0);
+					return _create_token(p_tokenizer, TK_LESS_EQUAL, NULL);
 				case '<':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_LESS_LESS, 0);
+					return _create_token(p_tokenizer, TK_LESS_LESS, NULL);
 			}
-			return _create_token(p_tokenizer, TK_LESS, 0);
+			return _create_token(p_tokenizer, TK_LESS, NULL);
 		case '>':
 			_consume(p_tokenizer);
 			switch (_get_current_char(p_tokenizer)) {
 				case '=':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_GREATER_EQUAL, 0);
+					return _create_token(p_tokenizer, TK_GREATER_EQUAL, NULL);
 				case '<':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_GREATER_GREATER, 0);
+					return _create_token(p_tokenizer, TK_GREATER_GREATER, NULL);
 			}
-			return _create_token(p_tokenizer, TK_GREATER, 0);
+			return _create_token(p_tokenizer, TK_GREATER, NULL);
 		case '=':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '=') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_EQUAL_EQUAL, 0);
+				return _create_token(p_tokenizer, TK_EQUAL_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_EQUAL, 0);
+			return _create_token(p_tokenizer, TK_EQUAL, NULL);
 		case '!':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '=') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_BANG_EQUAL, 0);
+				return _create_token(p_tokenizer, TK_BANG_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_BANG, 0);
+			return _create_token(p_tokenizer, TK_BANG, NULL);
 		case '&':
 			_consume(p_tokenizer);
 			switch (_get_current_char(p_tokenizer)) {
 				case '&':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_AMPERSAND_AMPERSAND, 0);
+					return _create_token(p_tokenizer, TK_AMPERSAND_AMPERSAND, NULL);
 				case '=':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_AMPERSAND_EQUAL, 0);
+					return _create_token(p_tokenizer, TK_AMPERSAND_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_AMPERSAND, 0);
+			return _create_token(p_tokenizer, TK_AMPERSAND, NULL);
 		case '|':
 			_consume(p_tokenizer);
 			switch (_get_current_char(p_tokenizer)) {
 				case '|':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_PIPE_PIPE, 0);
+					return _create_token(p_tokenizer, TK_PIPE_PIPE, NULL);
 				case '=':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_PIPE_EQUAL, 0);
+					return _create_token(p_tokenizer, TK_PIPE_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_PIPE, 0);
+			return _create_token(p_tokenizer, TK_PIPE, NULL);
 		case '~':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_TILDE, 0);
+			return _create_token(p_tokenizer, TK_TILDE, NULL);
 		case '^':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '=') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_CARET_EQUAL, 0);
+				return _create_token(p_tokenizer, TK_CARET_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_CARET, 0);
+			return _create_token(p_tokenizer, TK_CARET, NULL);
 		case '+':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '=') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_PLUS_EQUAL, 0);
+				return _create_token(p_tokenizer, TK_PLUS_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_PLUS, 0);
+			return _create_token(p_tokenizer, TK_PLUS, NULL);
 		case '-':
 			_consume(p_tokenizer);
 			switch (_get_current_char(p_tokenizer)) {
 				case '=':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_MINUS_EQUAL, 0);
+					return _create_token(p_tokenizer, TK_MINUS_EQUAL, NULL);
 				case '>':
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_FORWARD_ARROW, 0);
+					return _create_token(p_tokenizer, TK_FORWARD_ARROW, NULL);
 			}
-			return _create_token(p_tokenizer, TK_MINUS, 0);
+			return _create_token(p_tokenizer, TK_MINUS, NULL);
 		case '*':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '*') {
 				_consume(p_tokenizer);
 				if (_get_current_char(p_tokenizer) == '=') {
 					_consume(p_tokenizer);
-					return _create_token(p_tokenizer, TK_STAR_STAR_EQUAL, 0);
+					return _create_token(p_tokenizer, TK_STAR_STAR_EQUAL, NULL);
 				}
-				return _create_token(p_tokenizer, TK_STAR_STAR, 0);
+				return _create_token(p_tokenizer, TK_STAR_STAR, NULL);
 			}
-			return _create_token(p_tokenizer, TK_STAR, 0);
+			return _create_token(p_tokenizer, TK_STAR, NULL);
 		case '/':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '=') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_SLASH_EQUAL, 0);
+				return _create_token(p_tokenizer, TK_SLASH_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_SLASH, 0);
+			return _create_token(p_tokenizer, TK_SLASH, NULL);
 		case '%':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '=') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_PERCENT_EQUAL, 0);
+				return _create_token(p_tokenizer, TK_PERCENT_EQUAL, NULL);
 			}
-			return _create_token(p_tokenizer, TK_PERCENT, 0);
+			return _create_token(p_tokenizer, TK_PERCENT, NULL);
 		case '[':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_BRACKET_OPEN, 0);
+			return _create_token(p_tokenizer, TK_BRACKET_OPEN, NULL);
 		case ']':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_BRACKET_CLOSE, 0);
+			return _create_token(p_tokenizer, TK_BRACKET_CLOSE, NULL);
 		case '{':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_BRACE_OPEN, 0);
+			return _create_token(p_tokenizer, TK_BRACE_OPEN, NULL);
 		case '}':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_BRACE_CLOSE, 0);
+			return _create_token(p_tokenizer, TK_BRACE_CLOSE, NULL);
 		case '(':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_PARENTHESIS_OPEN, 0);
+			return _create_token(p_tokenizer, TK_PARENTHESIS_OPEN, NULL);
 		case ')':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_PARENTHESIS_CLOSE, 0);
+			return _create_token(p_tokenizer, TK_PARENTHESIS_CLOSE, NULL);
 		case ',':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_COMMA, 0);
+			return _create_token(p_tokenizer, TK_COMMA, NULL);
 		case ';':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_SEMICOLON, 0);
+			return _create_token(p_tokenizer, TK_SEMICOLON, NULL);
 		case '.':
 			_consume(p_tokenizer);
 			if (_get_current_char(p_tokenizer) == '.') {
 				_consume(p_tokenizer);
-				return _create_token(p_tokenizer, TK_PERIOD_PERIOD, 0);
+				return _create_token(p_tokenizer, TK_PERIOD_PERIOD, NULL);
 			}
-			return _create_token(p_tokenizer, TK_PERIOD, 0);
+			return _create_token(p_tokenizer, TK_PERIOD, NULL);
 		case ':':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_COLON, 0);
+			return _create_token(p_tokenizer, TK_COLON, NULL);
 		case '$':
 			_consume(p_tokenizer);
-			return _create_token(p_tokenizer, TK_DOLLAR, 0);
+			return _create_token(p_tokenizer, TK_DOLLAR, NULL);
 		case '"':
 			return _parse_string(p_tokenizer);
 		case '#':
@@ -627,7 +612,7 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
                 return _parse_identifier(p_tokenizer);
     }
 
-    return _create_token(p_tokenizer, TK_ERROR, (intptr_t)ERR(UNREACHABLE));
+    return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(UNREACHABLE));
 }
 
 
@@ -637,16 +622,42 @@ Token *tokenizerGetCurrent(Tokenizer *p_tokenizer) {
 
 
 void tokenizerPush(Tokenizer *p_tokenizer) {
-
+	// FIXME: IMPLEMENT THIS
 }
 
 
 Token *tokenizerPop(Tokenizer *p_tokenizer) {
+	// FIXME: IMPLEMENT THIS
     return NULL;
 }
 
-const char* tokenizerGetTokenName(TK_TYPE p_type) {
-    return token_names[p_type];
+
+Literal *tokenizerTokenGetLiteral(const Token* p_token) {
+	switch (p_token->type) {
+		case TK_IDENTIFIER:
+		case TK_LITERAL:
+			return (Literal*)p_token->data;
+		default:
+			break;
+	}
+	return NULL;
+}
+
+
+const char *tokenizerTokenGetErrorString(const Token* p_token) {
+	if (p_token->type == TK_ERROR)
+		return (char*)p_token->data;
+	return NULL;
+}
+
+
+TK_TYPE tokenizerTokenGetType(const Token *p_token) {
+	return p_token->type;
+}
+
+
+const char *tokenizerTokenGetTypeName(const Token *p_token) {
+    return token_names[p_token->type];
 }
 
 void tokenizerTerminate(Tokenizer *p_tokenizer)

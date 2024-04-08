@@ -1,7 +1,7 @@
 #ifndef TOKENIZER_H
 #define TOKENIZER_H
 
-#include <stdint.h>
+#include "literal.h"
 
 typedef enum {
     TK_EMPTY,
@@ -123,21 +123,7 @@ typedef struct tokenizer Tokenizer;
 
 typedef char (*TkGetCharCallback)(void*);
 
-typedef struct {
-    TK_TYPE type;
-    intptr_t value;
-} Token;
-
-typedef enum {
-    LT_INT,
-    LT_FLOAT,
-    LT_STRING
-} LT_TYPE ;
-
-typedef struct {
-    LT_TYPE type;
-    intptr_t value;
-} Literal;
+typedef struct token Token;
 
 
 Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx);
@@ -146,7 +132,11 @@ Token *tokenizerGetCurrent(Tokenizer *p_tokenizer);
 void tokenizerPush(Tokenizer *p_tokenizer);
 Token *tokenizerPop(Tokenizer *p_tokenizer);
 
-const char* tokenizerGetTokenName(TK_TYPE p_type);
+Literal *tokenizerTokenGetLiteral(const Token* p_token);
+const char *tokenizerTokenGetErrorString(const Token* p_token);
+TK_TYPE tokenizerTokenGetType(const Token *p_token);
+const char *tokenizerTokenGetTypeName(const Token *p_token);
+
 void tokenizerTerminate(Tokenizer *p_tokenizer);
 
 #endif // TOKENIZER_H
