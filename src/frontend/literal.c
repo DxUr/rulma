@@ -4,13 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct literal {
-    LT_TYPE type;
+struct Literal {
+    LiteralType type;
     void* val;
 };
 
 
-Literal *literalCreate(const LT_TYPE p_type, const void* p_data) {
+Literal *literalCreate(const LiteralType p_type, const void* p_data) {
     Literal *lt = (Literal*)malloc(sizeof(Literal));
     lt->type = p_type;
     switch (p_type) {
@@ -30,7 +30,7 @@ Literal *literalCreate(const LT_TYPE p_type, const void* p_data) {
     return lt;
 }
 
-LT_TYPE literalGetType(const Literal *p_lt)
+LiteralType literalGetType(const Literal *p_lt)
 {
     return p_lt->type;
 }

@@ -1,5 +1,6 @@
 #include "tokenizer.h"
 
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -10,9 +11,24 @@
 #define MAX_IDENTIFIER_LENGTH 64
 #define MAX_NUMBER_LENGTH 128
 
-struct token {
-    TK_TYPE type;
+
+struct Token {
+    TokenType type;
     void* data;
+	int line;
+	const char *source;
+};
+
+
+struct Tokenizer {
+    TkGetCharCallback get_char_callback;
+    void* callback_bind_ctx;
+    Token *current_tk;
+    bool tk_should_be_free;
+    char last_char;
+    bool is_char_consumed;
+	int line;
+	const char *source;
 };
 
 
@@ -88,7 +104,7 @@ static const char *token_names[] = {
 	"break", // BREAK,
 	"continue", // CONTINUE,
 	"pass", // PASS,
-	"return", // RETURN,
+	"ret", // RETURN,
 	"match", // MATCH,
 	"when", // WHEN,
 	// Keywords
@@ -104,14 +120,15 @@ static const char *token_names[] = {
 	"func", // FUNC,
 	"in", // IN,
 	"is", // IS,
-	"namespace", // NAMESPACE
+	"let", // LET,
 	"preload", // PRELOAD,
 	"self", // SELF,
 	"signal", // SIGNAL,
+	"space", // NAMESPACE
 	"static", // STATIC,
 	"super", // SUPER,
 	"trait", // TRAIT,
-	"var", // VAR,
+	"type", // TYPE,
 	"void", // VOID,
 	"yield", // YIELD,
 	// Punctuation
@@ -148,20 +165,10 @@ static const char *token_names[] = {
 };
 
 
-struct tokenizer {
-    TkGetCharCallback get_char_callback;
-    void* callback_bind_ctx;
-    Token *current_tk;
-    bool tk_should_be_free;
-    int indent_lv;
-    char last_char;
-    bool is_char_consumed;
-};
-
-
 /*
  * Utility functions
 */
+
 
 static void _advance(Tokenizer *p_tokenizer) {
     p_tokenizer->last_char = p_tokenizer->get_char_callback(p_tokenizer->callback_bind_ctx);
@@ -220,21 +227,22 @@ static void _free_token(Token *p_token) {
 }
 
 
-static Token *_create_token(Tokenizer *p_tokenizer, TK_TYPE p_type, void *p_data) {
+static Token *_create_token(Tokenizer *p_tokenizer, TokenType p_type, void *p_data) {
     Token *tk = (Token*)malloc(sizeof(Token));
     if (!tk)
         return NULL;
     tk->type = p_type;
     tk->data = p_data;
+	tk->line = p_tokenizer->line;
+	tk->source = p_tokenizer->source;
     if (p_tokenizer->current_tk && p_tokenizer->tk_should_be_free)
         _free_token(p_tokenizer->current_tk);
     p_tokenizer->current_tk = tk;
-    p_tokenizer->indent_lv = 0;
     return tk;
 }
 
 
-static TK_TYPE _which_identifier(const char *p_str, size_t p_len) {
+static TokenType _which_identifier(const char *p_str, size_t p_len) {
 	if (p_len > MAX_KEYWORD_LENGTH || p_len < MIN_KEYWORD_LENGTH)
 		return TK_IDENTIFIER;
 	
@@ -264,19 +272,20 @@ static TK_TYPE _which_identifier(const char *p_str, size_t p_len) {
 		KEYWORD_GROUP('e')
 			KEYWORD("elif", TK_ELIF)
 			KEYWORD("else", TK_ELSE)
-			KEYWORD("enum", TK_ENUM)      
+			KEYWORD("enum", TK_ENUM)
 			KEYWORD("extends", TK_EXTENDS)
 		KEYWORD_GROUP('f')
 			KEYWORD("for", TK_FOR)
 			KEYWORD("func", TK_FUNC)
 		KEYWORD_GROUP('i')
-			KEYWORD("if", TK_IF)          
-			KEYWORD("in", TK_IN)          
-			KEYWORD("is", TK_IS)          
+			KEYWORD("if", TK_IF)
+			KEYWORD("in", TK_IN)
+			KEYWORD("is", TK_IS)
+		KEYWORD_GROUP('l')
+			KEYWORD("let", TK_LET)
 		KEYWORD_GROUP('m')
 			KEYWORD("match", TK_MATCH)
 		KEYWORD_GROUP('n')
-			KEYWORD("namespace", TK_NAMESPACE)
 			KEYWORD("not", TK_NOT)
 		KEYWORD_GROUP('o')
 			KEYWORD("or", TK_OR)
@@ -284,16 +293,17 @@ static TK_TYPE _which_identifier(const char *p_str, size_t p_len) {
 			KEYWORD("pass", TK_PASS)
 			KEYWORD("preload", TK_PRELOAD)
 		KEYWORD_GROUP('r')
-			KEYWORD("return", TK_RETURN)
+			KEYWORD("ret", TK_RET)
 		KEYWORD_GROUP('s')
 			KEYWORD("self", TK_SELF)
 			KEYWORD("signal", TK_SIGNAL)
+			KEYWORD("space", TK_SPACE)
 			KEYWORD("static", TK_STATIC)
 			KEYWORD("super", TK_SUPER)
 		KEYWORD_GROUP('t')
 			KEYWORD("trait", TK_TRAIT)
+			KEYWORD("type", TK_TYPE)
 		KEYWORD_GROUP('v')
-			KEYWORD("var", TK_VAR)
 			KEYWORD("void", TK_VOID)
 		KEYWORD_GROUP('w')
 			KEYWORD("while", TK_WHILE)
@@ -343,7 +353,7 @@ static Token *_parse_identifier(Tokenizer *p_tokenizer) {
 	if (len == MAX_IDENTIFIER_LENGTH - 1 && _is_alphanum(_get_current_char(p_tokenizer)))
 		return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(IDENTIFIER_TOO_LONG));
 
-	TK_TYPE tk_type = has_digit ? TK_IDENTIFIER : _which_identifier(name, len);
+	TokenType tk_type = has_digit ? TK_IDENTIFIER : _which_identifier(name, len);
 	Literal *lt = NULL;
 	if (tk_type == TK_IDENTIFIER)
 		lt = literalCreate(LT_STRING, (void*)name);
@@ -423,7 +433,7 @@ static void _parse_comment(Tokenizer *p_tokenizer) {
 }
 
 
-Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx) {
+Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx, const char *p_source) {
     Tokenizer* tk = (Tokenizer*)malloc(sizeof(Tokenizer));
     if (!tk)
         return NULL;
@@ -433,6 +443,8 @@ Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx) {
     tk->tk_should_be_free = true;
     tk->last_char = -1;
     tk->is_char_consumed = true;
+	tk->line = 1;
+	tk->source = p_source;
     return tk;
 }
 
@@ -444,6 +456,7 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
         case -1:
             return _create_token(p_tokenizer, TK_EOF, NULL);
         case '\n':
+			p_tokenizer->line++;
 		case '\t':
         case ' ':
             _consume(p_tokenizer);
@@ -616,8 +629,22 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
 }
 
 
+TokenType tokenizerAdvanceType(Tokenizer *p_tokenizer) {
+	return tokenizerAdvance(p_tokenizer)->type;
+}
+
+
 Token *tokenizerGetCurrent(Tokenizer *p_tokenizer) {
+	if (!p_tokenizer->current_tk)
+		tokenizerAdvance(p_tokenizer);
     return p_tokenizer->current_tk;
+}
+
+
+TokenType tokenizerGetCurrentType(Tokenizer *p_tokenizer) {
+	if (!p_tokenizer->current_tk)
+		tokenizerAdvance(p_tokenizer);
+	return p_tokenizer->current_tk->type;
 }
 
 
@@ -632,7 +659,7 @@ Token *tokenizerPop(Tokenizer *p_tokenizer) {
 }
 
 
-Literal *tokenizerTokenGetLiteral(const Token* p_token) {
+Literal *tokenizerTokenGetLiteral(const Token *p_token) {
 	switch (p_token->type) {
 		case TK_IDENTIFIER:
 		case TK_LITERAL:
@@ -644,14 +671,14 @@ Literal *tokenizerTokenGetLiteral(const Token* p_token) {
 }
 
 
-const char *tokenizerTokenGetErrorString(const Token* p_token) {
+const char *tokenizerTokenGetErrorString(const Token *p_token) {
 	if (p_token->type == TK_ERROR)
 		return (char*)p_token->data;
 	return NULL;
 }
 
 
-TK_TYPE tokenizerTokenGetType(const Token *p_token) {
+TokenType tokenizerTokenGetType(const Token *p_token) {
 	return p_token->type;
 }
 
@@ -659,6 +686,22 @@ TK_TYPE tokenizerTokenGetType(const Token *p_token) {
 const char *tokenizerTokenGetTypeName(const Token *p_token) {
     return token_names[p_token->type];
 }
+
+
+const char *tokenizerTokenTypeName(const TokenType p_type) {
+	return token_names[p_type];
+}
+
+
+int tokenizerTokenGetLine(const Token *p_token) {
+	return p_token->line;
+}
+
+
+const char *tokenizerTokenGetSource(const Token *p_token) {
+	return p_token->source;
+}
+
 
 void tokenizerTerminate(Tokenizer *p_tokenizer)
 {

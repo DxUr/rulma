@@ -4,5 +4,8 @@
     "value": {
         "author": "Djawad",
         "description": "A new Language"
+    },
+    "lang.c": {
+        "cflags": ["-std=c2x"]
     }
 }

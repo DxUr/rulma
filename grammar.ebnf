@@ -1,0 +1,38 @@
+unit = {declaration};
+
+
+declaration
+    = namespaceDeclaration
+    | typeDeclaration
+    | enumDeclaration
+    | letDeclaration
+    | methodDeclaration
+    ;
+
+namespaceDeclaration = "namespace" IDENTIFIER "{" {declaration} "}";
+
+typeDeclaration = "type" IDENTIFIER "{" letDeclaration "}";
+
+enumDeclaration = "enum" IDENTIFIER "{" [IDENTIFIER] {"," IDENTIFIER} "}";
+
+letDeclaration = "let" IDENTIFIER [":" (IDENTIFIER | typeDeclaration) ["=" (LITERAL | IDENTIFIER | expresion)]];
+
+methodDeclaration = "fn" IDENTIFIER "(" [parameter {"," parameter}] ")" [IDENTIFIER | typeDeclaration] "{" [statement] "}";
+
+statement
+    = {declaration
+    | ("if" expresion statement ["else" statement])
+    | ("match" expresion "{" {(IDENTIFIER | expresion) ":" statement} [(UNDERSCORE) ":" statement] "}")
+    | ("{" statement "}")
+    };
+
+expresion = unary | unary operator expresion;
+
+unary = ("-" | "!") value | value;
+
+value = LITERAL | ("(" expresion ")");
+
+operator
+    = "==" | "!=" | "<" | "<=" | ">" | ">="
+    | "&" | "|" | "~" | "^" | "<<" | ">>"
+    | "+" | "-" | "*" | "/";

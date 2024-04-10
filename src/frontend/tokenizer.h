@@ -59,7 +59,7 @@ typedef enum {
     TK_BREAK,
     TK_CONTINUE,
     TK_PASS,
-    TK_RETURN,
+    TK_RET,
     TK_MATCH,
     TK_WHEN,
     // Keywords
@@ -75,14 +75,15 @@ typedef enum {
     TK_FUNC,
     TK_IN,
     TK_IS,
-    TK_NAMESPACE,
+    TK_LET,
     TK_PRELOAD,
     TK_SELF,
     TK_SIGNAL,
+    TK_SPACE,
     TK_STATIC,
     TK_SUPER,
     TK_TRAIT,
-    TK_VAR,
+    TK_TYPE,
     TK_VOID,
     TK_YIELD,
     // Punctuation
@@ -116,26 +117,31 @@ typedef enum {
     // Special
     TK_ERROR,
     TK_EOF
-} TK_TYPE;
+} TokenType;
 
 
-typedef struct tokenizer Tokenizer;
+typedef struct Tokenizer Tokenizer;
 
 typedef char (*TkGetCharCallback)(void*);
 
-typedef struct token Token;
+typedef struct Token Token;
 
 
-Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx);
+Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx, const char *p_source);
 Token *tokenizerAdvance(Tokenizer *p_tokenizer);
+TokenType tokenizerAdvanceType(Tokenizer *p_tokenizer);
 Token *tokenizerGetCurrent(Tokenizer *p_tokenizer);
+TokenType tokenizerGetCurrentType(Tokenizer *p_tokenizer);
 void tokenizerPush(Tokenizer *p_tokenizer);
 Token *tokenizerPop(Tokenizer *p_tokenizer);
 
-Literal *tokenizerTokenGetLiteral(const Token* p_token);
-const char *tokenizerTokenGetErrorString(const Token* p_token);
-TK_TYPE tokenizerTokenGetType(const Token *p_token);
+Literal *tokenizerTokenGetLiteral(const Token *p_token);
+const char *tokenizerTokenGetErrorString(const Token *p_token);
+TokenType tokenizerTokenGetType(const Token *p_token);
 const char *tokenizerTokenGetTypeName(const Token *p_token);
+const char *tokenizerTokenTypeName(const TokenType p_type);
+int tokenizerTokenGetLine(const Token *p_token);
+const char *tokenizerTokenGetSource(const Token *p_token);
 
 void tokenizerTerminate(Tokenizer *p_tokenizer);
 

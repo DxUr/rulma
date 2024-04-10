@@ -1,6 +1,8 @@
 #include <laMa.h>
 
 #include "frontend/tokenizer.h"
+#include "frontend/parser.h"
+
 #include <stdio.h>
 
 char get_char(void *p_ctx) {
@@ -9,11 +11,18 @@ char get_char(void *p_ctx) {
 
 int main(int argc, char *argv[]) {
 
-    FILE *f = fopen(argv[1], "rb");
+    FILE *file = fopen(argv[1], "rb");
 
     // Init the tokenizer
-    Tokenizer *tk = tokenizerInit(get_char, (void*)f);
+    Tokenizer *tk = tokenizerInit(get_char, (void*)file, argv[1]);
+    
+    Parser *pr = parserInit(tk);
 
+    parserParse(pr);
+
+    parserTerminate(pr);
+
+    /*
     while (tokenizerTokenGetType(tokenizerAdvance(tk)) != TK_EOF) {
         Token* t = tokenizerGetCurrent(tk);
         printf("TOKEN: %s\n", tokenizerTokenGetTypeName(t));
@@ -41,7 +50,8 @@ int main(int argc, char *argv[]) {
     }
     
     printf("TOKEN: %s\n", tokenizerTokenGetTypeName(tokenizerGetCurrent(tk)));
-
+    */
+    
     tokenizerTerminate(tk);
 
     return 0;
