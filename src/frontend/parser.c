@@ -127,13 +127,12 @@ int parserParse(Parser *p_parser) {
             case PROC_UNIT:
                 switch (ctx->state) {
                     case 0:
-                    unit_get_declaration:
-                        _stack_push(p_parser, _create_ctx(PROC_DECLARATION));
                         ctx->state++;
+                        unit_get_declaration:
+                        _stack_push(p_parser, _create_ctx(PROC_DECLARATION));
                         continue;
                     case 1:
                         if (p_parser->stack_popped) {
-                            ctx->state--;
                             goto unit_get_declaration;
                         }
                         break;
@@ -324,8 +323,9 @@ int parserParse(Parser *p_parser) {
             case PROC_EXPRESSION:
                 switch (ctx->state) {
                     case 0:
-                        _stack_push(p_parser, _create_ctx(PROC_EXP_BINARY));
                         ctx->state++;
+                        expression_get_binary:
+                        _stack_push(p_parser, _create_ctx(PROC_EXP_BINARY));
                         continue;
                     case 1:
                         if (p_parser->stack_popped) {
@@ -333,9 +333,7 @@ int parserParse(Parser *p_parser) {
                                 case TK_PLUS:
                                 case TK_MINUS:
                                     tokenizerAdvance(p_parser->tokenizer);
-                                    _stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
-                                    ctx->state++;
-                                    continue;
+                                    goto expression_get_binary;
                                 default:
                                     break;
                             }
@@ -389,6 +387,7 @@ int parserParse(Parser *p_parser) {
                 switch (ctx->state) {
                     case 0:
                         if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_LITERAL) {
+                            printf("%d", *(int*)literalGetVal(tokenizerTokenGetLiteral(tokenizerGetCurrent(p_parser->tokenizer))));
                             tokenizerAdvance(p_parser->tokenizer);
                             break;
                         }

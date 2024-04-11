@@ -26,7 +26,7 @@ statement
     | ("{" statement "}")
     };
 
-expresion = binary | binary operatorLow expresion;
+expresion = binary {operatorLow binary};
 
 binary = [("-" | "!")] value [operatorHight binary];
 
