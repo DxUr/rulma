@@ -457,6 +457,7 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
             return _create_token(p_tokenizer, TK_EOF, NULL);
         case '\n':
 			p_tokenizer->line++;
+			__attribute__((fallthrough));
 		case '\t':
         case ' ':
             _consume(p_tokenizer);

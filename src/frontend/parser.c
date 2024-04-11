@@ -15,7 +15,7 @@ typedef enum {
     PROC_METHOD_DECLARATION,
     PROC_STATEMENT,
     PROC_EXPRESSION,
-    PROC_EXP_UNARY,
+    PROC_EXP_BINARY,
     PROC_EXP_VALUE,
 } PROC_TYPE;
 
@@ -324,7 +324,7 @@ int parserParse(Parser *p_parser) {
             case PROC_EXPRESSION:
                 switch (ctx->state) {
                     case 0:
-                        _stack_push(p_parser, _create_ctx(PROC_EXP_UNARY));
+                        _stack_push(p_parser, _create_ctx(PROC_EXP_BINARY));
                         ctx->state++;
                         continue;
                     case 1:
@@ -332,8 +332,6 @@ int parserParse(Parser *p_parser) {
                             switch (tokenizerGetCurrentType(p_parser->tokenizer)) {
                                 case TK_PLUS:
                                 case TK_MINUS:
-                                case TK_STAR:
-                                case TK_SLASH:
                                     tokenizerAdvance(p_parser->tokenizer);
                                     _stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
                                     ctx->state++;
@@ -353,7 +351,7 @@ int parserParse(Parser *p_parser) {
                 }
                 _stack_pop(p_parser);
                 continue;
-            case PROC_EXP_UNARY:
+            case PROC_EXP_BINARY:
                 switch (ctx->state) {
                     case 0:
                         if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_MINUS
@@ -365,12 +363,28 @@ int parserParse(Parser *p_parser) {
                         continue;
                     case 1:
                         if (p_parser->stack_popped) {
-                            _stack_pop(p_parser);
-                            continue;
+                            switch (tokenizerGetCurrentType(p_parser->tokenizer)) {
+                                case TK_STAR:
+                                case TK_SLASH:
+                                    tokenizerAdvance(p_parser->tokenizer);
+                                    _stack_push(p_parser, _create_ctx(PROC_EXP_BINARY));
+                                    ctx->state++;
+                                    continue;
+                                default:
+                                    break;
+                            }
+                            break;
                         }
-                        break;
+                        _stack_pop_then_free(p_parser);
+                        continue;
+                    case 2:
+                        if (p_parser->stack_popped) {
+                            break;
+                        }
+                        ERR_EXPECTED_NON_TERMINAL("EXPRESSION")
                 }
-                ERR_EXPECTED_NON_TERMINAL("VALUE")
+                _stack_pop(p_parser);
+                continue;
             case PROC_EXP_VALUE:
                 switch (ctx->state) {
                     case 0:

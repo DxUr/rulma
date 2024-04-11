@@ -26,13 +26,15 @@ statement
     | ("{" statement "}")
     };
 
-expresion = unary | unary operator expresion;
+expresion = binary | binary operatorLow expresion;
 
-unary = ("-" | "!") value | value;
+binary = [("-" | "!")] value [operatorHight binary];
 
 value = LITERAL | ("(" expresion ")");
 
-operator
+operatorLow
     = "==" | "!=" | "<" | "<=" | ">" | ">="
     | "&" | "|" | "~" | "^" | "<<" | ">>"
-    | "+" | "-" | "*" | "/";
+    | "+" | "-";
+
+operatorHight = "*" | "/";
