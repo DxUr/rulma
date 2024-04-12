@@ -2,29 +2,33 @@ unit = {declaration};
 
 
 declaration
-    = namespaceDeclaration
-    | typeDeclaration
-    | enumDeclaration
-    | letDeclaration
-    | methodDeclaration
-    ;
+	= namespaceDeclaration
+	| typeDeclaration
+	| enumDeclaration
+	| letDeclaration
+	| methodDeclaration
+	;
 
 namespaceDeclaration = "namespace" IDENTIFIER "{" {declaration} "}";
 
 typeDeclaration = "type" IDENTIFIER "{" letDeclaration "}";
 
-enumDeclaration = "enum" IDENTIFIER "{" [IDENTIFIER] {"," IDENTIFIER} "}";
+enumDeclaration = "enum" IDENTIFIER "{" [enumMember {"," enumMember} ] "}";
 
-letDeclaration = "let" IDENTIFIER [":" (IDENTIFIER | typeDeclaration) ["=" (LITERAL | IDENTIFIER | expresion)]];
+enumMember = IDENTIFIER ["(" IDENTIFIER ")"];
 
-methodDeclaration = "fn" IDENTIFIER "(" [parameter {"," parameter}] ")" [IDENTIFIER | typeDeclaration] "{" [statement] "}";
+letDeclaration = "let" IDENTIFIER [":" ["const"] IDENTIFIER] ["=" (LITERAL | IDENTIFIER | expresion)];
+
+methodDeclaration = "fn" IDENTIFIER "(" [parameter {"," parameter}] ")" [IDENTIFIER] "{" [statement] "}";
+
+scope = statement | "{" {statement} "}";
 
 statement
-    = {declaration
-    | ("if" expresion statement ["else" statement])
-    | ("match" expresion "{" {(IDENTIFIER | expresion) ":" statement} [(UNDERSCORE) ":" statement] "}")
-    | ("{" statement "}")
-    };
+	= declaration
+	| ("if" expresion statement ["else" statement])
+	| ("match" expresion "{" {(IDENTIFIER | expresion) ":" statement} [(UNDERSCORE) ":" statement] "}")
+	| scope
+	;
 
 expresion = binary {operatorLow binary};
 
@@ -33,8 +37,8 @@ binary = [("-" | "!")] value [operatorHight binary];
 value = LITERAL | ("(" expresion ")");
 
 operatorLow
-    = "==" | "!=" | "<" | "<=" | ">" | ">="
-    | "&" | "|" | "~" | "^" | "<<" | ">>"
-    | "+" | "-";
+	= "==" | "!=" | "<" | "<=" | ">" | ">="
+	| "&" | "|" | "~" | "^" | "<<" | ">>"
+	| "+" | "-";
 
 operatorHight = "*" | "/";

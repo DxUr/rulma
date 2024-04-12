@@ -1,15 +1,16 @@
-let false = 1+(1*(5))
+let false : static int = 1+(1*(5))
 let true = 1
-let anes = "Good Job"
 
 type T {
 	let a = 1
 	let b = 2
 }
 
+let anes : const = "Good Job"
+
 enum FOO {
-	JOHN,
-	WICK
+	JOHN(T),
+	WICK(T)
 }
 
 func foo() {

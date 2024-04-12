@@ -13,20 +13,20 @@
 
 
 struct Token {
-    TokenType type;
-    void* data;
+	TokenType type;
+	void* data;
 	int line;
 	const char *source;
 };
 
 
 struct Tokenizer {
-    TkGetCharCallback get_char_callback;
-    void* callback_bind_ctx;
-    Token *current_tk;
-    bool tk_should_be_free;
-    char last_char;
-    bool is_char_consumed;
+	TkGetCharCallback get_char_callback;
+	void* callback_bind_ctx;
+	Token *current_tk;
+	bool tk_should_be_free;
+	char last_char;
+	bool is_char_consumed;
 	int line;
 	const char *source;
 };
@@ -35,12 +35,14 @@ struct Tokenizer {
 /* ERRORS: */
 enum {
 	UNREACHABLE,
+	UNRECOGNIZABLE,
 	IDENTIFIER_TOO_LONG,
 	INVALID_NUMBER,
 	UNTERMINATED_STRING,
 };
 static const char *errors[] = {
 	"Unreachable",
+	"Unrecognizable",
 	"Identifier too long",
 	"Invalid number",
 	"Unterminated string",
@@ -171,25 +173,25 @@ static const char *token_names[] = {
 
 
 static void _advance(Tokenizer *p_tokenizer) {
-    p_tokenizer->last_char = p_tokenizer->get_char_callback(p_tokenizer->callback_bind_ctx);
+	p_tokenizer->last_char = p_tokenizer->get_char_callback(p_tokenizer->callback_bind_ctx);
 	p_tokenizer->is_char_consumed = false;
 }
 
 
 static void _consume(Tokenizer *p_tokenizer) {
-    p_tokenizer->is_char_consumed = true;
+	p_tokenizer->is_char_consumed = true;
 }
 
 
 static char _get_current_char(Tokenizer *p_tokenizer) {
-    if (p_tokenizer->is_char_consumed)
-        _advance(p_tokenizer);
-    return p_tokenizer->last_char;
+	if (p_tokenizer->is_char_consumed)
+		_advance(p_tokenizer);
+	return p_tokenizer->last_char;
 }
 
 
 static bool _is_digit(char p_char) {
-    return p_char >= '0' && p_char <= '9';
+	return p_char >= '0' && p_char <= '9';
 }
 
 
@@ -199,8 +201,8 @@ static inline bool _is_underscore(char p_char) {
 
 
 static bool _is_alpha(char p_char) {
-    return  (p_char >= 'A' && p_char <= 'Z') ||
-            (p_char >= 'a' && p_char <= 'z');
+	return  (p_char >= 'A' && p_char <= 'Z') ||
+			(p_char >= 'a' && p_char <= 'z');
 }
 
 
@@ -223,22 +225,22 @@ static void _free_token(Token *p_token) {
 		default:
 			break;
 	}
-    free(p_token);
+	free(p_token);
 }
 
 
 static Token *_create_token(Tokenizer *p_tokenizer, TokenType p_type, void *p_data) {
-    Token *tk = (Token*)malloc(sizeof(Token));
-    if (!tk)
-        return NULL;
-    tk->type = p_type;
-    tk->data = p_data;
+	Token *tk = (Token*)malloc(sizeof(Token));
+	if (!tk)
+		return NULL;
+	tk->type = p_type;
+	tk->data = p_data;
 	tk->line = p_tokenizer->line;
 	tk->source = p_tokenizer->source;
-    if (p_tokenizer->current_tk && p_tokenizer->tk_should_be_free)
-        _free_token(p_tokenizer->current_tk);
-    p_tokenizer->current_tk = tk;
-    return tk;
+	if (p_tokenizer->current_tk && p_tokenizer->tk_should_be_free)
+		_free_token(p_tokenizer->current_tk);
+	p_tokenizer->current_tk = tk;
+	return tk;
 }
 
 
@@ -434,34 +436,34 @@ static void _parse_comment(Tokenizer *p_tokenizer) {
 
 
 Tokenizer *tokenizerInit(TkGetCharCallback p_get_char, void* p_bind_ctx, const char *p_source) {
-    Tokenizer* tk = (Tokenizer*)malloc(sizeof(Tokenizer));
-    if (!tk)
-        return NULL;
-    tk->get_char_callback = p_get_char;
-    tk->callback_bind_ctx = p_bind_ctx;
-    tk->current_tk = NULL;
-    tk->tk_should_be_free = true;
-    tk->last_char = -1;
-    tk->is_char_consumed = true;
+	Tokenizer* tk = (Tokenizer*)malloc(sizeof(Tokenizer));
+	if (!tk)
+		return NULL;
+	tk->get_char_callback = p_get_char;
+	tk->callback_bind_ctx = p_bind_ctx;
+	tk->current_tk = NULL;
+	tk->tk_should_be_free = true;
+	tk->last_char = -1;
+	tk->is_char_consumed = true;
 	tk->line = 1;
 	tk->source = p_source;
-    return tk;
+	return tk;
 }
 
 
 Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
-    start:;
-    char c = _get_current_char(p_tokenizer);
-    switch (c) {
-        case -1:
-            return _create_token(p_tokenizer, TK_EOF, NULL);
-        case '\n':
+	start:;
+	char c = _get_current_char(p_tokenizer);
+	switch (c) {
+		case -1:
+			return _create_token(p_tokenizer, TK_EOF, NULL);
+		case '\n':
 			p_tokenizer->line++;
 			__attribute__((fallthrough));
 		case '\t':
-        case ' ':
-            _consume(p_tokenizer);
-            goto start;
+		case ' ':
+			_consume(p_tokenizer);
+			goto start;
 		case '@':
 			_consume(p_tokenizer);
 			return _create_token(p_tokenizer, TK_ANNOTATION, NULL);
@@ -617,16 +619,16 @@ Token *tokenizerAdvance(Tokenizer *p_tokenizer) {
 			return _parse_string(p_tokenizer);
 		case '#':
 			_consume(p_tokenizer);
-            _parse_comment(p_tokenizer);
+			_parse_comment(p_tokenizer);
 			goto start;
-        default:
-            if (_is_digit(c))
-                return _parse_number(p_tokenizer);
-            else if (_is_alpha(c) || _is_underscore(c))
-                return _parse_identifier(p_tokenizer);
-    }
+		default:
+			if (_is_digit(c))
+				return _parse_number(p_tokenizer);
+			else if (_is_alpha(c) || _is_underscore(c))
+				return _parse_identifier(p_tokenizer);
+	}
 
-    return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(UNREACHABLE));
+	return _create_token(p_tokenizer, TK_ERROR, (void*)ERR(UNRECOGNIZABLE));
 }
 
 
@@ -638,7 +640,7 @@ TokenType tokenizerAdvanceType(Tokenizer *p_tokenizer) {
 Token *tokenizerGetCurrent(Tokenizer *p_tokenizer) {
 	if (!p_tokenizer->current_tk)
 		tokenizerAdvance(p_tokenizer);
-    return p_tokenizer->current_tk;
+	return p_tokenizer->current_tk;
 }
 
 
@@ -656,7 +658,7 @@ void tokenizerPush(Tokenizer *p_tokenizer) {
 
 Token *tokenizerPop(Tokenizer *p_tokenizer) {
 	// FIXME: IMPLEMENT THIS
-    return NULL;
+	return NULL;
 }
 
 
@@ -685,7 +687,7 @@ TokenType tokenizerTokenGetType(const Token *p_token) {
 
 
 const char *tokenizerTokenGetTypeName(const Token *p_token) {
-    return token_names[p_token->type];
+	return token_names[p_token->type];
 }
 
 
@@ -706,5 +708,5 @@ const char *tokenizerTokenGetSource(const Token *p_token) {
 
 void tokenizerTerminate(Tokenizer *p_tokenizer)
 {
-    free(p_tokenizer);
+	free(p_tokenizer);
 }
