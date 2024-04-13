@@ -1,8 +1,8 @@
-#ifndef LAMA_H
-#define LAMA_H
+#ifndef RULMA_H
+#define RULMA_H
 
 /* This generated file contains includes for project dependencies */
-#include "laMa/bake_config.h"
+#include "rulma/bake_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,5 +12,5 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif // RULMA_H
 

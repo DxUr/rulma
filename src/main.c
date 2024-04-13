@@ -1,4 +1,4 @@
-#include <laMa.h>
+#include <rulma.h>
 
 #include "frontend/tokenizer.h"
 #include "frontend/parser.h"

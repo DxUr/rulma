@@ -15,6 +15,7 @@ typedef enum {
 	PROC_TYPE_DECLARATION,
 	PROC_LET_DECLARATION,
 	PROC_METHOD_DECLARATION,
+	PROC_SCOPE,
 	PROC_STATEMENT,
 	PROC_EXPRESSION,
 	PROC_EXP_BINARY,
@@ -46,12 +47,14 @@ struct Parser {
 #define STR(E) #E
 
 #define ERR_EXPECTED_TERMINAL(TERMINAL) {\
+	printf(__FILE__":%d\n", __LINE__);\
 	errorExpectedToken(TERMINAL, tokenizerGetCurrent(p_parser->tokenizer));\
 	_end_parsing(p_parser);\
 	return -1;\
 }
 
 #define ERR_EXPECTED_NON_TERMINAL(NON_TERMINAL) {\
+	printf(__FILE__":%d\n", __LINE__);\
 	errorExpected(NON_TERMINAL, tokenizerGetCurrent(p_parser->tokenizer));\
 	_end_parsing(p_parser);\
 	return -1;\
@@ -307,18 +310,36 @@ int parserParse(Parser *p_parser) {
 							// FIXME: implement function parameters
 							tokenizerAdvance(p_parser->tokenizer);
 						}
-						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_OPEN)
-							ERR_EXPECTED_TERMINAL(TK_BRACE_OPEN)
+						ctx->state = 1;
+						_stack_push(p_parser, _create_ctx(PROC_SCOPE));
+						continue;
+					case 1:
+						if (!p_parser->stack_popped)
+							ERR_EXPECTED_NON_TERMINAL("SCOPE")
+				}
+				_stack_pop(p_parser);
+				continue;
+			case PROC_SCOPE:
+				switch (ctx->state) {
+					case 0:
+						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_OPEN) {
+							_stack_pop_then_free(p_parser);
+							continue;
+						}
 						tokenizerAdvance(p_parser->tokenizer);
-					method_get_dec_stmt:
+					scope_get_declaration:
 						ctx->state = 1;
 						_stack_push(p_parser, _create_ctx(PROC_DECLARATION));
 						continue;
 					case 2:
+						_stack_push(p_parser, _create_ctx(PROC_STATEMENT));
+						ctx->state++;
+						continue;
+					case 4:
 						break;
 					default:
 						if (p_parser->stack_popped) {
-							goto method_get_dec_stmt;
+							goto scope_get_declaration;
 						}
 						ctx->state++;
 						continue;
@@ -329,9 +350,116 @@ int parserParse(Parser *p_parser) {
 				_stack_pop(p_parser);
 				continue;
 			case PROC_STATEMENT:
-				// FIXME: IMPLEMENT THIS
-
-
+				switch (ctx->state) {
+					case 0:
+						switch (tokenizerGetCurrentType(p_parser->tokenizer)) {
+							case TK_IDENTIFIER:
+								if (tokenizerAdvanceType(p_parser->tokenizer) != TK_EQUAL)
+									ERR_EXPECTED_TERMINAL(TK_EQUAL)
+								tokenizerAdvance(p_parser->tokenizer);
+								_stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
+								ctx->state = 1;
+								continue;
+							case TK_IF:
+								tokenizerAdvance(p_parser->tokenizer);
+								_stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
+								ctx->state = 2;
+								continue;
+							case TK_MATCH:
+								tokenizerAdvance(p_parser->tokenizer);
+								_stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
+								ctx->state = 4;
+								continue;
+							case TK_WHILE:
+								// FIXME: implement while statement
+							case TK_FOR:
+								// FIXME: implement for statement
+							case TK_RET:
+								// FIXME: implement return statement
+							case TK_BREAK:
+								// FIXME: implement break statement
+							case TK_CONTINUE:
+								// FIXME: implement continue statement
+							default:
+						}
+						break;
+					case 1:
+						if (p_parser->stack_popped) {
+							_stack_pop(p_parser);
+							continue;
+						}
+						ERR_EXPECTED_NON_TERMINAL("EXPRESSION")
+					case 2:
+						if (p_parser->stack_popped) {
+							_stack_push(p_parser, _create_ctx(PROC_SCOPE));
+							ctx->state = 3;
+							continue;
+						}
+						ERR_EXPECTED_NON_TERMINAL("EXPRESSION")
+					case 3:
+						if (p_parser->stack_popped) {
+							_stack_pop(p_parser);
+							continue;
+						}
+						ERR_EXPECTED_NON_TERMINAL("SCOPE")
+					case 4:
+						if (!p_parser->stack_popped)
+							ERR_EXPECTED_NON_TERMINAL("EXPRESSION")
+						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_OPEN)
+							ERR_EXPECTED_TERMINAL(TK_BRACE_OPEN)
+						tokenizerAdvance(p_parser->tokenizer);
+						if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_BRACE_CLOSE) {
+							tokenizerAdvance(p_parser->tokenizer);
+							_stack_pop(p_parser);
+							continue;
+						}
+					match_get_case:
+						if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_UNDERSCORE) {
+							if (tokenizerAdvanceType(p_parser->tokenizer) != TK_FORWARD_ARROW)
+								ERR_EXPECTED_TERMINAL(TK_FORWARD_ARROW)
+							tokenizerAdvance(p_parser->tokenizer);
+							_stack_push(p_parser, _create_ctx(PROC_SCOPE));
+							ctx->state = 8;
+							continue;
+						}
+						_stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
+						ctx->state = 5;
+						continue;
+					case 5:
+						if (!p_parser->stack_popped)
+							goto match_end;
+						__attribute__((fallthrough));
+					case 6:
+						if (!p_parser->stack_popped)
+							ERR_EXPECTED_NON_TERMINAL("EXPRESSION")
+						if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_COMMA) {
+							tokenizerAdvance(p_parser->tokenizer);
+							_stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
+							ctx->state = 6;
+							continue;
+						}
+						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_FORWARD_ARROW)
+							ERR_EXPECTED_TERMINAL(TK_FORWARD_ARROW)
+						tokenizerAdvance(p_parser->tokenizer);
+						_stack_push(p_parser, _create_ctx(PROC_SCOPE));
+						ctx->state = 7;
+						continue;
+					case 7:
+						if (!p_parser->stack_popped)
+							ERR_EXPECTED_NON_TERMINAL("SCOPE")
+						goto match_get_case;
+					case 8:
+						if (!p_parser->stack_popped)
+							ERR_EXPECTED_NON_TERMINAL("SCOPE")
+						__attribute__((fallthrough));
+					case 9:
+					match_end:
+						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_CLOSE)
+							ERR_EXPECTED_TERMINAL(TK_BRACE_CLOSE)
+						tokenizerAdvance(p_parser->tokenizer);
+						_stack_pop(p_parser);
+						continue;
+				}
 				_stack_pop_then_free(p_parser);
 				continue;
 			case PROC_EXPRESSION:
@@ -402,6 +530,10 @@ int parserParse(Parser *p_parser) {
 				switch (ctx->state) {
 					case 0:
 						if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_LITERAL) {
+							tokenizerAdvance(p_parser->tokenizer);
+							break;
+						}
+						if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_IDENTIFIER) {
 							tokenizerAdvance(p_parser->tokenizer);
 							break;
 						}
