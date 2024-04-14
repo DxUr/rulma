@@ -72,7 +72,7 @@ typedef enum {
     TK_CONST,
     TK_ENUM,
     TK_EXTENDS,
-    TK_FUNC,
+    TK_FN,
     TK_IN,
     TK_IS,
     TK_LET,

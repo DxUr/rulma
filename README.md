@@ -11,16 +11,16 @@ let a = 10
 let b = 5
 
 space Math {
-    func sum(_a, _b) {
+    fn sum(_a, _b) {
         ret _a + _b
     }
 }
 
-func foo() {
+fn foo() {
     let c
     c = Math.sum(a, b)
 
-    func multiply(_a, _b) {
+    fn multiply(_a, _b) {
         ret _a * _b
     }
 

@@ -119,7 +119,7 @@ static const char *token_names[] = {
 	"const", // CONST,
 	"enum", // ENUM,
 	"extends", // EXTENDS,
-	"func", // FUNC,
+	"fn", // FN,
 	"in", // IN,
 	"is", // IS,
 	"let", // LET,
@@ -168,7 +168,7 @@ static const char *token_names[] = {
 
 
 /*
- * Utility functions
+ * Utility fntions
 */
 
 
@@ -212,7 +212,7 @@ static inline bool _is_alphanum(char p_char) {
 
 
 /*
- * Tokenizer functions
+ * Tokenizer fntions
 */
 
 
@@ -278,7 +278,7 @@ static TokenType _which_identifier(const char *p_str, size_t p_len) {
 			KEYWORD("extends", TK_EXTENDS)
 		KEYWORD_GROUP('f')
 			KEYWORD("for", TK_FOR)
-			KEYWORD("func", TK_FUNC)
+			KEYWORD("fn", TK_FN)
 		KEYWORD_GROUP('i')
 			KEYWORD("if", TK_IF)
 			KEYWORD("in", TK_IN)

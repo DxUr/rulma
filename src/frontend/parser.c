@@ -10,7 +10,7 @@ typedef enum {
 	// PROC stands for procedure
 	PROC_UNIT,
 	PROC_DECLARATION,
-	PROC_NAMESPACE_DECLARATION,
+	PROC_SPACE_DECLARATION,
 	PROC_ENUM_DECLARATION,
 	PROC_TYPE_DECLARATION,
 	PROC_LET_DECLARATION,
@@ -150,26 +150,14 @@ int parserParse(Parser *p_parser) {
 				proc_declaration:
 				switch (ctx->state) {
 					case 0:
-						_stack_push(p_parser, _create_ctx(PROC_NAMESPACE_DECLARATION));
-						ctx->state++; // TODO: if the compiler do not optmize this make it `ctx->state = x`
-						continue;
-					case 2:
-						_stack_push(p_parser, _create_ctx(PROC_ENUM_DECLARATION));
-						ctx->state++;
-						continue;
-					case 4:
-						_stack_push(p_parser, _create_ctx(PROC_TYPE_DECLARATION));
-						ctx->state++;
-						continue;
-					case 6:
 						_stack_push(p_parser, _create_ctx(PROC_LET_DECLARATION));
 						ctx->state++;
 						continue;
-					case 8:
+					case 2:
 						_stack_push(p_parser, _create_ctx(PROC_METHOD_DECLARATION));
 						ctx->state++;
 						continue;
-					case 10:
+					case 4:
 						break;
 					default:
 						if (p_parser->stack_popped) {
@@ -181,25 +169,25 @@ int parserParse(Parser *p_parser) {
 				}
 				_stack_pop_then_free(p_parser);
 				continue;
-			case PROC_NAMESPACE_DECLARATION:
+			case PROC_SPACE_DECLARATION:
 				switch (ctx->state) {
 					case 0:
 						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_SPACE) {
 							_stack_pop_then_free(p_parser);
 							continue;
 						}
-						if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
-							ERR_EXPECTED_TERMINAL(TK_IDENTIFIER);
+						// if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
+						// 	ERR_EXPECTED_TERMINAL(TK_IDENTIFIER);
 						if (tokenizerAdvanceType(p_parser->tokenizer) != TK_BRACE_OPEN)
 							ERR_EXPECTED_TERMINAL(TK_BRACE_OPEN)
 						tokenizerAdvance(p_parser->tokenizer);
 						ctx->state = 1;
-					namespace_get_declaration:
+					space_get_declaration:
 						_stack_push(p_parser, _create_ctx(PROC_DECLARATION));
 						continue;
 					default:
 						if (p_parser->stack_popped) {
-							goto namespace_get_declaration;
+							goto space_get_declaration;
 						}
 				}
 				if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_CLOSE)
@@ -212,8 +200,8 @@ int parserParse(Parser *p_parser) {
 					_stack_pop_then_free(p_parser);
 					continue;
 				}
-				if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
-					ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
+				// if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
+				//	ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
 				if (tokenizerAdvanceType(p_parser->tokenizer) != TK_BRACE_OPEN)
 					ERR_EXPECTED_TERMINAL(TK_BRACE_OPEN)
 				while (tokenizerAdvanceType(p_parser->tokenizer) == TK_IDENTIFIER) {
@@ -240,8 +228,8 @@ int parserParse(Parser *p_parser) {
 							_stack_pop_then_free(p_parser);
 							continue;
 						}
-						if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
-							ERR_EXPECTED_TERMINAL(TK_IDENTIFIER);
+						// if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
+						//	ERR_EXPECTED_TERMINAL(TK_IDENTIFIER);
 						if (tokenizerAdvanceType(p_parser->tokenizer) != TK_BRACE_OPEN)
 							ERR_EXPECTED_TERMINAL(TK_BRACE_OPEN)
 						tokenizerAdvance(p_parser->tokenizer);
@@ -270,9 +258,9 @@ int parserParse(Parser *p_parser) {
 							ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
 						if (tokenizerAdvanceType(p_parser->tokenizer) == TK_COLON) {
 							if (tokenizerAdvanceType(p_parser->tokenizer) == TK_CONST ||
-								tokenizerAdvanceType(p_parser->tokenizer) == TK_STATIC) {
+								tokenizerGetCurrentType(p_parser->tokenizer) == TK_STATIC) {
 								if (tokenizerAdvanceType(p_parser->tokenizer) != TK_IDENTIFIER)
-									tokenizerAdvance(p_parser->tokenizer);
+									ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
 							}
 							else if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_IDENTIFIER)
 								ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
@@ -281,9 +269,14 @@ int parserParse(Parser *p_parser) {
 						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_EQUAL) {
 							break;
 						}
-						tokenizerAdvance(p_parser->tokenizer);
 						ctx->state = 1;
-						_stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
+						if (tokenizerAdvanceType(p_parser->tokenizer) == TK_SPACE)
+							_stack_push(p_parser, _create_ctx(PROC_SPACE_DECLARATION));
+						else if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_ENUM)
+							_stack_push(p_parser, _create_ctx(PROC_ENUM_DECLARATION));
+						else if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_TYPE) {
+							_stack_push(p_parser, _create_ctx(PROC_TYPE_DECLARATION));
+						} else _stack_push(p_parser, _create_ctx(PROC_EXPRESSION));
 						continue;
 					default:
 						if (p_parser->stack_popped) {
@@ -296,7 +289,7 @@ int parserParse(Parser *p_parser) {
 			case PROC_METHOD_DECLARATION:
 				switch (ctx->state) {
 					case 0:
-						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_FUNC) {
+						if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_FN) {
 							_stack_pop_then_free(p_parser);
 							continue;
 						}
@@ -307,7 +300,7 @@ int parserParse(Parser *p_parser) {
 						if (tokenizerAdvanceType(p_parser->tokenizer) != TK_PARENTHESIS_CLOSE)
 							ERR_EXPECTED_TERMINAL(TK_PARENTHESIS_CLOSE)
 						if (tokenizerAdvanceType(p_parser->tokenizer) == TK_IDENTIFIER) {
-							// FIXME: implement function parameters
+							// FIXME: implement fntion parameters
 							tokenizerAdvance(p_parser->tokenizer);
 						}
 						ctx->state = 1;
