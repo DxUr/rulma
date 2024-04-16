@@ -1,3 +1,12 @@
+
+
+let E =
+
+let T = space {
+
+}
+
+
 let false : static int = 1+(1*(5))
 let true = 1
 
@@ -11,8 +20,9 @@ let alloc = space {
 	}
 }
 
+let Square = type{lenght int}
 
-fn _get_area(self: &Square) {
+fn get_area(self: &Square) {
 	ret self.lenght * self.lenght
 }
 
@@ -48,4 +58,11 @@ fn Vector(T: @type, n: int) @type {
 fn foo() {
 	let a = alloc.new(int)
 	let b = a
+
+	let a: Optional(int)
+	match a {
+		Some(v) {}
+		None {}
+	}
+
 }

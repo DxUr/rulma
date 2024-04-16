@@ -6,6 +6,6 @@
         "description": "A new Language"
     },
     "lang.c": {
-        "cflags": ["-std=c2x"]
+        "cflags": ["-std=c2x -I./src"]
     }
 }

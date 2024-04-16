@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 struct Literal {
     LiteralType type;
@@ -10,7 +11,7 @@ struct Literal {
 };
 
 
-Literal *literalCreate(const LiteralType p_type, const void* p_data) {
+Literal *literalCreate(const LiteralType p_type, const void *p_data) {
     Literal *lt = (Literal*)malloc(sizeof(Literal));
     lt->type = p_type;
     switch (p_type) {
@@ -30,8 +31,7 @@ Literal *literalCreate(const LiteralType p_type, const void* p_data) {
     return lt;
 }
 
-LiteralType literalGetType(const Literal *p_lt)
-{
+LiteralType literalGetType(const Literal *p_lt) {
     return p_lt->type;
 }
 
@@ -39,8 +39,12 @@ void *literalGetVal(const Literal* p_lt) {
     return p_lt->val;
 }
 
+const char *literalStringGetVal(const Literal *p_lt) {
+    assert(p_lt && p_lt->type);
+    return (char*)p_lt->val;
+}
 
-void literalFree(Literal* p_lt) {
+void literalFree(Literal *p_lt) {
     if(!p_lt)
         return;
     free(p_lt->val);

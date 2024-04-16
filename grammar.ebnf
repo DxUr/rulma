@@ -2,22 +2,19 @@ unit = {declaration};
 
 
 declaration
-	= namespaceDeclaration
-	| typeDeclaration
-	| enumDeclaration
-	| letDeclaration
+	= letDeclaration
 	| methodDeclaration
 	;
 
-namespaceDeclaration = "namespace" IDENTIFIER "{" {declaration} "}";
+letDeclaration = "let" IDENTIFIER [":" ["const"] IDENTIFIER] ["=" (LITERAL | IDENTIFIER | expresion)];
 
-typeDeclaration = "type" IDENTIFIER "{" letDeclaration "}";
+namespaceDeclaration = "space" "{" {declaration} "}";
 
-enumDeclaration = "enum" IDENTIFIER "{" [enumMember {"," enumMember} ] "}";
+typeDeclaration = "type" "{" letDeclaration "}";
+
+enumDeclaration = "enum" "{" [enumMember {"," enumMember} ] "}";
 
 enumMember = IDENTIFIER ["(" IDENTIFIER ")"];
-
-letDeclaration = "let" IDENTIFIER [":" ["const"] IDENTIFIER] ["=" (LITERAL | IDENTIFIER | expresion)];
 
 methodDeclaration = "fn" IDENTIFIER "(" [parameter {"," parameter}] ")" [IDENTIFIER] "{" [statement] "}";
 

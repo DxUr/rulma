@@ -1,20 +1,23 @@
 #include "parser.h"
 #include "error.h"
 
+#include "syntax_tree/syntax_tree.h"
+#include "extra/hash.h"
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <setjmp.h>
 
 
 typedef enum {
 	// PROC stands for procedure
-	PROC_UNIT,
-	PROC_DECLARATION,
-	PROC_SPACE_DECLARATION,
-	PROC_ENUM_DECLARATION,
-	PROC_TYPE_DECLARATION,
-	PROC_LET_DECLARATION,
-	PROC_METHOD_DECLARATION,
+	PROC_SPACE,
+	PROC_SUBSPACE,
+	PROC_ENUM,
+	PROC_IDENTIFIER,
+	PROC_LET,
+	PROC_METHOD,
 	PROC_SCOPE,
 	PROC_STATEMENT,
 	PROC_EXPRESSION,
@@ -25,8 +28,8 @@ typedef enum {
 typedef int PROC_STATE;
 
 typedef struct ParseCtx {
-	PROC_TYPE type;
-	PROC_STATE state;
+	Node *node;
+	jmp_buf ret_buf;
 	struct ParseCtx *prev_ctx;
 } ParseCtx;
 
@@ -76,22 +79,22 @@ void _free_ctx(ParseCtx *p_ctx) {
 }
 
 
-ParseCtx *_create_ctx(PROC_TYPE p_type) {
+ParseCtx *_create_ctx() {
 	ParseCtx *ctx = (ParseCtx*)malloc(sizeof(ParseCtx));
-	ctx->type = p_type;
-	ctx->state = 0;
+	ctx->node = NULL;
 	ctx->prev_ctx = NULL;
 	return ctx;
 }
 
 
-ParseCtx *_stack_push(Parser* p_parser, ParseCtx* p_ctx) {
+ParseCtx *_stack_push(Parser* p_parser) {
 	p_parser->depth++;
 	if (p_parser->depth > p_parser->max_depth)
 		p_parser->max_depth = p_parser->depth;
-	p_ctx->prev_ctx = p_parser->stack_top;
-	p_parser->stack_top = p_ctx;
-	return p_ctx;
+	ParseCtx *ctx = _create_ctx();
+	ctx->prev_ctx = p_parser->stack_top;
+	p_parser->stack_top = ctx;
+	return ctx;
 }
 
 
@@ -115,7 +118,6 @@ void _end_parsing(Parser *p_parser) {
 	// FIXME: Free the syntax tree
 }
 
-
 Parser* parserInit(Tokenizer *p_tokenizer) {
 	Parser *p = (Parser*)malloc(sizeof(Parser));
 	p->tokenizer = p_tokenizer;
@@ -125,6 +127,75 @@ Parser* parserInit(Tokenizer *p_tokenizer) {
 	return p;
 }
 
+
+int parserParse(Parser *p_parser) {
+	#define PROC(P) P:
+	#define ctx p_parser->stack_top
+	#define CALL(F) {if (!setjmp(ctx->ret_buf)) {_stack_push(p_parser); goto F;}}
+	#define RETURN {_stack_pop(p_parser); longjmp(ctx->ret_buf, 1);}
+	#define RET(R) {ctx->node = R; RETURN}
+	#define POPPED p_parser->stack_popped->node
+	_stack_push(p_parser);
+	CALL(PROC_SPACE)
+
+	return 0;
+
+
+	PROC(PROC_IDENTIFIER) {
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_IDENTIFIER)
+			RET(NULL)
+		Node *identifier = nodeIdentifierCreate(hashFNV1AStr(
+				literalStringGetVal(
+					tokenizerTokenGetLiteral(tokenizerGetCurrent(p_parser->tokenizer)))));
+		tokenizerAdvance(p_parser->tokenizer);
+		RET(identifier)
+	}
+
+
+	PROC(PROC_SPACE) {
+		ctx->node = nodeSpaceCreate();
+		while (true) {
+			CALL(PROC_LET)
+			if (POPPED) {
+				nodeSpaceAddChild(ctx->node, POPPED);
+				continue;
+			}
+			CALL(PROC_METHOD)
+			if (POPPED) {
+				nodeSpaceAddChild(ctx->node, POPPED);
+				continue;
+			}
+			break;
+		}
+		RETURN
+	}
+
+
+	PROC(PROC_LET) {
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_LET)
+			RET(NULL)
+		tokenizerAdvance(p_parser->tokenizer);
+		CALL(PROC_IDENTIFIER)
+		if (!POPPED)
+			ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
+		Node *let = nodeLetCreate(POPPED);
+		RET(let)
+	}
+
+
+
+	PROC(PROC_METHOD) {
+
+	}
+
+	#undef PROC
+	#undef ctx
+	#undef CALL
+	#undef RET
+	return 1;
+}
+
+#if 0
 
 int parserParse(Parser *p_parser) {
 	for (ParseCtx *ctx = _stack_push(p_parser, _create_ctx(PROC_UNIT)); ctx; ctx = p_parser->stack_top) {
@@ -555,7 +626,7 @@ int parserParse(Parser *p_parser) {
 	}
 	return 0;
 }
-
+#endif
 
 void parserTerminate(Parser *p_parser) {
 	free(p_parser);
