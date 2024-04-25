@@ -15,15 +15,17 @@ typedef enum {
 	PROC_SPACE,
 	PROC_SUBSPACE,
 	PROC_ENUM,
+	PROC_TYPE,
 	PROC_IDENTIFIER,
 	PROC_LET,
 	PROC_METHOD,
 	PROC_SCOPE,
+	PROC_PARAMETER_LIST,
 	PROC_STATEMENT,
 	PROC_EXPRESSION,
 	PROC_EXP_BINARY,
 	PROC_EXP_VALUE,
-} PROC_TYPE;
+} ProcType;
 
 typedef int PROC_STATE;
 
@@ -137,7 +139,7 @@ int parserParse(Parser *p_parser) {
 	#define POPPED p_parser->stack_popped->node
 	_stack_push(p_parser);
 	CALL(PROC_SPACE)
-
+	nodeExpose(POPPED);
 	return 0;
 
 
@@ -171,6 +173,20 @@ int parserParse(Parser *p_parser) {
 	}
 
 
+	PROC(PROC_SUBSPACE) {
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_SPACE)
+			RET(NULL)
+		if (tokenizerAdvanceType(p_parser->tokenizer) != TK_BRACE_OPEN)
+			ERR_EXPECTED_TERMINAL(TK_BRACE_OPEN)
+		tokenizerAdvance(p_parser->tokenizer);
+		CALL(PROC_SPACE)
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_CLOSE)
+			ERR_EXPECTED_TERMINAL(TK_BRACE_CLOSE)
+		tokenizerAdvance(p_parser->tokenizer);
+		RET(POPPED)
+	}
+
+
 	PROC(PROC_LET) {
 		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_LET)
 			RET(NULL)
@@ -178,14 +194,75 @@ int parserParse(Parser *p_parser) {
 		CALL(PROC_IDENTIFIER)
 		if (!POPPED)
 			ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
-		Node *let = nodeLetCreate(POPPED);
-		RET(let)
+		ctx->node = nodeLetCreate(POPPED);
+		
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_EQUAL)
+			RETURN
+		if (tokenizerAdvanceType(p_parser->tokenizer) == TK_PARENTHESIS_OPEN) {
+			CALL(PROC_METHOD)
+			if (!POPPED)
+				ERR_EXPECTED_NON_TERMINAL("METHOD")
+			RETURN
+		}
+		while (true) {
+			CALL(PROC_SUBSPACE)
+			if (POPPED)
+				break;
+			CALL(PROC_TYPE)
+			if (POPPED)
+				break;
+			CALL(PROC_EXPRESSION)
+			if (POPPED)
+				break;
+		}
+		nodeLetSetValue(ctx->node, POPPED);
+		RETURN
 	}
 
 
-
 	PROC(PROC_METHOD) {
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_PARENTHESIS_OPEN)
+			RET(NULL)
+		tokenizerAdvance(p_parser->tokenizer);
+		ctx->node = nodeMethodCreate();
+		CALL(PROC_PARAMETER_LIST)
+		if(POPPED)
+			nodeMethodSetParameters(ctx->node, POPPED);
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_PARENTHESIS_CLOSE)
+			ERR_EXPECTED_TERMINAL(TK_PARENTHESIS_CLOSE)
+		tokenizerAdvance(p_parser->tokenizer);
+		CALL(PROC_TYPE)
+		if (POPPED)
+			nodeMethodSetType(ctx->node, POPPED);
+		CALL(PROC_SCOPE)
+		if (!POPPED)
+			ERR_EXPECTED_NON_TERMINAL("SCOPE")
+		nodeMethodSetScope(ctx->node, POPPED);
+		RETURN
+	}
 
+
+	PROC(PROC_PARAMETER_LIST) {
+		RET(NULL)
+	}
+
+
+	PROC(PROC_TYPE) {
+		RET(NULL)
+	}
+
+
+	PROC(PROC_SCOPE) {
+		RET(NULL)
+	}
+
+
+	PROC(PROC_EXPRESSION) {
+		RET(NULL)
+	}
+
+	PROC(PROC_STATEMENT) {
+		RET(NULL)
 	}
 
 	#undef PROC

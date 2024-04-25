@@ -8,4 +8,5 @@
     "lang.c": {
         "cflags": ["-std=c2x -I./src"]
     }
+
 }

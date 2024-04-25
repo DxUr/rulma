@@ -9,6 +9,8 @@ typedef enum {
 
 typedef struct Node Node;
 
+void nodeExpose(const Node *p_node);
+
 Node *nodeIdentifierCreate(int p_value);
 Node *nodeSpaceCreate();
 Node *nodeLetCreate(const Node *p_identifier);
