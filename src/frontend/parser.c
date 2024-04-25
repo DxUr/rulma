@@ -162,11 +162,11 @@ int parserParse(Parser *p_parser) {
 				nodeSpaceAddChild(ctx->node, POPPED);
 				continue;
 			}
-			CALL(PROC_METHOD)
-			if (POPPED) {
-				nodeSpaceAddChild(ctx->node, POPPED);
-				continue;
-			}
+			// CALL(PROC_METHOD)
+			// if (POPPED) {
+			// 	nodeSpaceAddChild(ctx->node, POPPED);
+			// 	continue;
+			// }
 			break;
 		}
 		RETURN
@@ -253,7 +253,27 @@ int parserParse(Parser *p_parser) {
 
 
 	PROC(PROC_SCOPE) {
-		RET(NULL)
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_OPEN)
+			RET(NULL)
+		tokenizerAdvance(p_parser->tokenizer);
+		ctx->node = nodeScopeCreate();
+		while (true) {
+			CALL(PROC_LET)
+			if (POPPED) {
+				nodeScopeAddChild(ctx->node, POPPED);
+				continue;
+			}
+			CALL(PROC_STATEMENT)
+			if (POPPED) {
+				nodeScopeAddChild(ctx->node, POPPED);
+				continue;
+			}
+			break;
+		}
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_BRACE_CLOSE)
+			ERR_EXPECTED_TERMINAL(TK_BRACE_CLOSE)
+		tokenizerAdvance(p_parser->tokenizer);
+		RETURN
 	}
 
 
