@@ -128,6 +128,7 @@ static const char *token_names[] = {
 	"signal", // SIGNAL,
 	"space", // NAMESPACE
 	"static", // STATIC,
+	"struct",
 	"super", // SUPER,
 	"trait", // TRAIT,
 	"type", // TYPE,
@@ -301,6 +302,7 @@ static TokenType _which_identifier(const char *p_str, size_t p_len) {
 			KEYWORD("signal", TK_SIGNAL)
 			KEYWORD("space", TK_SPACE)
 			KEYWORD("static", TK_STATIC)
+			KEYWORD("struct", TK_STRUCT)
 			KEYWORD("super", TK_SUPER)
 		KEYWORD_GROUP('t')
 			KEYWORD("trait", TK_TRAIT)

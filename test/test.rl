@@ -1,15 +1,10 @@
-let SPACE = space {
-	
 
-
-
-
-
+let f() type {
 
 }
 
 
-
+let a = 5
 
 
 

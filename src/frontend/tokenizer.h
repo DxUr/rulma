@@ -81,6 +81,7 @@ typedef enum {
     TK_SIGNAL,
     TK_SPACE,
     TK_STATIC,
+    TK_STRUCT,
     TK_SUPER,
     TK_TRAIT,
     TK_TYPE,

@@ -1,8 +1,9 @@
 #include "parser.h"
 #include "error.h"
 
-#include "syntax_tree/syntax_tree.h"
-#include "extra/hash.h"
+#include "../syntax_tree/syntax_tree.h"
+#include "../extra/hash.h"
+#include "tokenizer.h"
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -139,7 +140,14 @@ int parserParse(Parser *p_parser) {
 	#define POPPED p_parser->stack_popped->node
 	_stack_push(p_parser);
 	CALL(PROC_SPACE)
+	if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_EOF)
+		ERR_EXPECTED_TERMINAL(TK_EOF)
+	FILE *f = fopen("./test/test.st", "w");
+	FILE *const std = stdout;
+	stdout = f;
 	nodeExpose(POPPED);
+	stdout = std;
+	fclose(f);
 	return 0;
 
 
@@ -196,25 +204,34 @@ int parserParse(Parser *p_parser) {
 			ERR_EXPECTED_TERMINAL(TK_IDENTIFIER)
 		ctx->node = nodeLetCreate(POPPED);
 		
-		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_EQUAL)
-			RETURN
-		if (tokenizerAdvanceType(p_parser->tokenizer) == TK_PARENTHESIS_OPEN) {
+		if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_PARENTHESIS_OPEN) {
 			CALL(PROC_METHOD)
 			if (!POPPED)
 				ERR_EXPECTED_NON_TERMINAL("METHOD")
+			nodeLetSetValue(ctx->node, POPPED);
 			RETURN
 		}
-		while (true) {
+
+		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_EQUAL)
+			RETURN
+		tokenizerAdvance(p_parser->tokenizer);
+
+		do {
 			CALL(PROC_SUBSPACE)
 			if (POPPED)
 				break;
 			CALL(PROC_TYPE)
 			if (POPPED)
 				break;
+			CALL(PROC_METHOD)
+			if (POPPED)
+				break;
 			CALL(PROC_EXPRESSION)
 			if (POPPED)
 				break;
-		}
+			ERR_EXPECTED_NON_TERMINAL("EXPRESSION")
+		} while(false);
+
 		nodeLetSetValue(ctx->node, POPPED);
 		RETURN
 	}
@@ -226,7 +243,7 @@ int parserParse(Parser *p_parser) {
 		tokenizerAdvance(p_parser->tokenizer);
 		ctx->node = nodeMethodCreate();
 		CALL(PROC_PARAMETER_LIST)
-		if(POPPED)
+		if (POPPED)
 			nodeMethodSetParameters(ctx->node, POPPED);
 		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_PARENTHESIS_CLOSE)
 			ERR_EXPECTED_TERMINAL(TK_PARENTHESIS_CLOSE)
@@ -248,7 +265,25 @@ int parserParse(Parser *p_parser) {
 
 
 	PROC(PROC_TYPE) {
-		RET(NULL)
+		CALL(PROC_IDENTIFIER)
+		if (POPPED)
+			RET(nodeTypeGetById(POPPED))
+		switch (tokenizerGetCurrentType(p_parser->tokenizer)) {
+			case TK_TYPE:
+				tokenizerAdvance(p_parser->tokenizer);
+				ctx->node = nodeTypeCreate(TYPE_INTERFACE);
+				RETURN
+			case TK_STRUCT:
+				tokenizerAdvance(p_parser->tokenizer);
+				ctx->node = nodeTypeCreate(TYPE_STRUCTURE);
+				RETURN
+			case TK_ENUM:
+				tokenizerAdvance(p_parser->tokenizer);
+				ctx->node = nodeTypeCreate(TYPE_ENUM);
+				RETURN
+			default:
+				RET(NULL)
+		}
 	}
 
 
