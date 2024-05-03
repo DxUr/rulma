@@ -1,10 +1,10 @@
 
-let f() type {
+let f(a: int) int {
 
 }
 
 
-let a = 5
+let a = type
 
 
 

@@ -18,10 +18,12 @@ typedef enum {
 	PROC_ENUM,
 	PROC_TYPE,
 	PROC_IDENTIFIER,
+	PROC_XIDENTIFIER,
 	PROC_LET,
 	PROC_METHOD,
 	PROC_SCOPE,
 	PROC_PARAMETER_LIST,
+	PROC_PARAM,
 	PROC_STATEMENT,
 	PROC_EXPRESSION,
 	PROC_EXP_BINARY,
@@ -154,11 +156,11 @@ int parserParse(Parser *p_parser) {
 	PROC(PROC_IDENTIFIER) {
 		if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_IDENTIFIER)
 			RET(NULL)
-		Node *identifier = nodeIdentifierCreate(hashFNV1AStr(
-				literalStringGetVal(
-					tokenizerTokenGetLiteral(tokenizerGetCurrent(p_parser->tokenizer)))));
 		tokenizerAdvance(p_parser->tokenizer);
-		RET(identifier)
+		RET(nodeIdentifierCreate(hashFNV1AStr(
+				literalStringGetVal(
+					tokenizerTokenGetLiteral(
+						tokenizerGetCurrent(p_parser->tokenizer))))))
 	}
 
 
@@ -170,11 +172,6 @@ int parserParse(Parser *p_parser) {
 				nodeSpaceAddChild(ctx->node, POPPED);
 				continue;
 			}
-			// CALL(PROC_METHOD)
-			// if (POPPED) {
-			// 	nodeSpaceAddChild(ctx->node, POPPED);
-			// 	continue;
-			// }
 			break;
 		}
 		RETURN
@@ -260,7 +257,37 @@ int parserParse(Parser *p_parser) {
 
 
 	PROC(PROC_PARAMETER_LIST) {
-		RET(NULL)
+
+		while (true) {
+			CALL(PROC_PARAM)
+			if (!POPPED)
+				break;
+
+			if (!ctx->node)
+				ctx->node = nodeParamListCreate();
+			nodeParamListAddParam(ctx->node, POPPED);
+		
+			if (tokenizerGetCurrentType(p_parser->tokenizer) != TK_COMMA)
+				break;
+			tokenizerAdvance(p_parser->tokenizer);
+		}
+		RETURN
+	}
+
+	PROC(PROC_PARAM) {
+		CALL(PROC_IDENTIFIER)
+		if (!POPPED)
+				RET(NULL)
+		ctx->node = nodeParamCreate(POPPED);
+		if (tokenizerGetCurrentType(p_parser->tokenizer) == TK_COLON) {
+			tokenizerAdvance(p_parser->tokenizer);
+			CALL(PROC_TYPE)
+			if (POPPED)
+				nodeParamSetType(ctx->node, POPPED);
+			else
+				ERR_EXPECTED_NON_TERMINAL("TYPE")
+		}
+		RETURN
 	}
 
 

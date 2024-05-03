@@ -1,5 +1,6 @@
 #include "syntax_tree.h"
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,10 +64,22 @@ typedef struct {
 
 typedef struct {
     Node base;
-    const Node *param;
+    const Node *params;
     const Node *ret_type;
     const Node *scope;
 } Method;
+
+
+typedef struct {
+    Node base;
+    const Node *type;
+} Param;
+
+
+typedef struct {
+    Node base;
+    LinkedList *last_child;
+} ParamList;
 
 
 NodeType nodeGetType(const Node *p_node) {
@@ -118,7 +131,7 @@ Node *nodeMethodCreate() {
     Method *method = ALLOC(Method);
     *method = (Method){
         .base.type = NODE_METHOD,
-        .param = NULL,
+        .params = NULL,
         .ret_type = NULL,
         .scope = NULL
     };
@@ -135,6 +148,26 @@ Node *nodeTypeCreate(TypeType p_type) {
         // FIXME: implement this
     };
     return (Node*)type;
+}
+
+
+Node *nodeParamCreate(const Node *p_identifier) {
+    Param *param = ALLOC(Param);
+    *param = (Param){
+        .base.type = NODE_PARAM,
+        .type = NULL,
+    };
+    return (Node*)param;
+}
+
+
+Node *nodeParamListCreate() {
+    ParamList *params = ALLOC(ParamList);
+    *params = (ParamList){
+        .base.type = NODE_PARAMLIST,
+        .last_child = NULL,
+    };
+    return (Node*)params;
 }
 
 
@@ -159,10 +192,10 @@ void nodeLetSetValue(Node *p_node, const Node *p_value) {
 
 
 void nodeMethodSetParameters(Node *p_node, const Node *p_param) {
-    assert(p_node && p_node->type == NODE_METHOD && p_param && p_param->type == NODE_PARAM);
+    assert(p_node && p_node->type == NODE_METHOD && p_param && p_param->type == NODE_PARAMLIST);
     Method *method = (Method*)p_node;
-    assert(!method->param);
-    method->param = p_param;
+    assert(!method->params);
+    method->params = p_param;
 }
 
 
@@ -185,6 +218,20 @@ void nodeMethodSetScope(Node *p_node, const Node *p_scope) {
 Node *nodeTypeGetById(const Node *p_identifier) {
     // FIXME: implement this
     return nodeTypeCreate(TYPE_INTERFACE);
+}
+
+
+void nodeParamListAddParam(Node *p_node, const Node *p_param) {
+    assert(p_node && p_param && p_node->type == NODE_PARAMLIST && p_param->type == NODE_PARAM);
+    ParamList *params = (ParamList*)p_node;
+    params->last_child = linkedListCreate(params->last_child, (void*)p_param);
+}
+
+
+void nodeParamSetType(Node *p_node, const Node* p_type) {
+    assert(p_node && p_type && p_node->type == NODE_PARAM && p_type->type == NODE_TYPE);
+    Param *param = (Param*)p_node;
+    param->type = p_type;
 }
 
 
@@ -268,6 +315,12 @@ void nodeExpose(const Node *p_node) {
             _indent(indent);
             puts("} #method");
             putchar('\n');
+            return;
+        }
+        case NODE_TYPE: {
+            Type *type = (Type*)p_node;
+            _indent(indent);
+            printf("type: %d\n", type->type);
             return;
         }
         default:

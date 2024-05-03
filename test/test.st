@@ -1,7 +1,9 @@
 
 space {
+  let HSEvHJ {
+    type: 2
+  } #let
 
-  let HSEvHJ
   let PcUoFJ {
 
     method 2 {

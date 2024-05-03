@@ -9,6 +9,7 @@ typedef enum {
     NODE_LET,
     NODE_METHOD,
     NODE_PARAM,
+    NODE_PARAMLIST,
 } NodeType;
 
 typedef enum {
@@ -29,6 +30,9 @@ Node *nodeScopeCreate();
 Node *nodeLetCreate(const Node *p_identifier);
 Node *nodeMethodCreate();
 Node *nodeTypeCreate(TypeType p_type);
+Node *nodeParamCreate(const Node *p_identifier);
+Node *nodeParamListCreate();
+
 
 
 void nodeSpaceAddChild(Node *p_node, const Node *p_child);
@@ -38,6 +42,10 @@ void nodeMethodSetParameters(Node *p_node, const Node *p_param);
 void nodeMethodSetType(Node *p_node, const Node *p_type);
 void nodeMethodSetScope(Node *p_node, const Node *p_scope);
 Node *nodeTypeGetById(const Node *p_identifier);
+void nodeParamListAddParam(Node *p_node, const Node *p_param);
+void nodeParamSetType(Node *p_node, const Node* p_type);
+
+
 
 NodeType nodeGetType(const Node *p_node);
 
